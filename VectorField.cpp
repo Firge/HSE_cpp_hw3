@@ -14,8 +14,10 @@ public:
     }
 
     T &get(int x, int y, int dx, int dy) {
-        size_t i = ranges::find(deltas, pair(dx, dy)) - deltas.begin();
-        assert(i < deltas.size());
-        return v[x][y][i];
+//         size_t i = ranges::find(deltas, pair(dx, dy)) - deltas.begin();
+//         assert(i < deltas.size());
+//         return v[x][y][i];
+        return v[x][y][((dy & 1) << 1) | (((dx & 1) & ((dx & 2) >> 1)) | ((dy & 1) & ((dy & 2) >> 1)))];
+
     }
 };
