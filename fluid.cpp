@@ -38,6 +38,7 @@ public:
             }
         }
 
+//        double start = clock(); // start time
         for (size_t i = 0; i < T; ++i) {
 
             Fixed<64, 32> total_delta_p = 0;
@@ -140,8 +141,12 @@ public:
                 cout << "Tick " << i << ":\n";
                 for (size_t x = 0; x < N; ++x) {
                     cout << tmp.field[x] << "\n";
+
                 }
             }
+//            if (i == 300){
+//                printf("total time for 300 ticks:%.4lf\n", (clock() - start) / CLOCKS_PER_SEC);
+//            }
         }
     }
 };
