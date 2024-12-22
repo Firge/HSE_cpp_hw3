@@ -3,7 +3,8 @@
 #include <functional>
 #include <unordered_map>
 #include <string>
-
+#include <thread>
+#include <vector>
 
 
 constexpr size_t N = 36, M = 84;
@@ -43,40 +44,91 @@ public:
 
             Fixed<64, 32> total_delta_p = 0;
             // Apply external forces
-            for (size_t x = 0; x < N; ++x) {
-                for (size_t y = 0; y < M; ++y) {
-                    if (tmp.field[x][y] == '#')
-                        continue;
-                    if (tmp.field[x + 1][y] != '#')
-                        tmp.velocity.add(x, y, 1, 0, tmp.g);
-                }
-            }
-
-            // Apply forces from p
-            memcpy(tmp.old_p, tmp.p, sizeof(tmp.p));
-            for (size_t x = 0; x < N; ++x) {
-                for (size_t y = 0; y < M; ++y) {
-                    if (tmp.field[x][y] == '#')
-                        continue;
-                    for (auto [dx, dy] : deltas) {
-                        int nx = x + dx, ny = y + dy;
-                        if (tmp.field[nx][ny] != '#' && tmp.old_p[nx][ny] < tmp.old_p[x][y]) {
-                            auto delta_p = tmp.old_p[x][y] - tmp.old_p[nx][ny];
-                            auto force = delta_p;
-                            auto &contr = tmp.velocity.get(nx, ny, -dx, -dy);
-                            if (contr * tmp.rho[(int) tmp.field[nx][ny]] >= force) {
-                                contr -= force / tmp.rho[(int) tmp.field[nx][ny]];
+//            for (size_t x = 0; x < N; ++x) {
+//                for (size_t y = 0; y < M; ++y) {
+//                    if (tmp.field[x][y] == '#')
+//                        continue;
+//                    if (tmp.field[x + 1][y] != '#')
+//                        tmp.velocity.add(x, y, 1, 0, tmp.g);
+//                }
+//            }
+// параллель на расчёт external forces
+            std::vector<std::thread> threads;
+            for (size_t t = 0; t < std::thread::hardware_concurrency(); ++t) {
+                threads.emplace_back([&, t]() {
+                    for (size_t x = t; x < N; x += std::thread::hardware_concurrency()) {
+                        for (size_t y = 0; y < M; ++y) {
+                            if (tmp.field[x][y] == '#')
                                 continue;
-                            }
-                            force -= contr * tmp.rho[(int) tmp.field[nx][ny]];
-                            contr = 0;
-                            tmp.velocity.add(x, y, dx, dy, force / tmp.rho[(int) tmp.field[x][y]]);
-                            tmp.p[x][y] -= force / tmp.dirs[x][y];
-                            total_delta_p -= force / tmp.dirs[x][y];
+                            if (tmp.field[x + 1][y] != '#')
+                                tmp.velocity.add(x, y, 1, 0, tmp.g);
                         }
                     }
-                }
+                });
             }
+            for (auto &th : threads) {
+                th.join();
+            }
+            threads.clear();
+
+            // Apply forces from p
+//            memcpy(tmp.old_p, tmp.p, sizeof(tmp.p));
+//            for (size_t x = 0; x < N; ++x) {
+//                for (size_t y = 0; y < M; ++y) {
+//                    if (tmp.field[x][y] == '#')
+//                        continue;
+//                    for (auto [dx, dy] : deltas) {
+//                        int nx = x + dx, ny = y + dy;
+//                        if (tmp.field[nx][ny] != '#' && tmp.old_p[nx][ny] < tmp.old_p[x][y]) {
+//                            auto delta_p = tmp.old_p[x][y] - tmp.old_p[nx][ny];
+//                            auto force = delta_p;
+//                            auto &contr = tmp.velocity.get(nx, ny, -dx, -dy);
+//                            if (contr * tmp.rho[(int) tmp.field[nx][ny]] >= force) {
+//                                contr -= force / tmp.rho[(int) tmp.field[nx][ny]];
+//                                continue;
+//                            }
+//                            force -= contr * tmp.rho[(int) tmp.field[nx][ny]];
+//                            contr = 0;
+//                            tmp.velocity.add(x, y, dx, dy, force / tmp.rho[(int) tmp.field[x][y]]);
+//                            tmp.p[x][y] -= force / tmp.dirs[x][y];
+//                            total_delta_p -= force / tmp.dirs[x][y];
+//                        }
+//                    }
+//                }
+//            }
+// распаралелленное давление
+            memcpy(tmp.old_p, tmp.p, sizeof(tmp.p));
+            for (size_t t = 0; t < std::thread::hardware_concurrency(); ++t) {
+                threads.emplace_back([&, t]() {
+                    for (size_t x = t; x < N; x += std::thread::hardware_concurrency()) {
+                        for (size_t y = 0; y < M; ++y) {
+                            if (tmp.field[x][y] == '#')
+                                continue;
+                            for (auto [dx, dy] : deltas) {
+                                int nx = x + dx, ny = y + dy;
+                                if (tmp.field[nx][ny] != '#' && tmp.old_p[nx][ny] < tmp.old_p[x][y]) {
+                                    auto delta_p = tmp.old_p[x][y] - tmp.old_p[nx][ny];
+                                    auto force = delta_p;
+                                    auto &contr = tmp.velocity.get(nx, ny, -dx, -dy);
+                                    if (contr * tmp.rho[(int)tmp.field[nx][ny]] >= force) {
+                                        contr -= force / tmp.rho[(int)tmp.field[nx][ny]];
+                                        continue;
+                                    }
+                                    force -= contr * tmp.rho[(int)tmp.field[nx][ny]];
+                                    contr = 0;
+                                    tmp.velocity.add(x, y, dx, dy, force / tmp.rho[(int)tmp.field[x][y]]);
+                                    tmp.p[x][y] -= force / tmp.dirs[x][y];
+                                    total_delta_p -= force / tmp.dirs[x][y];
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            for (auto &th : threads) {
+                th.join();
+            }
+            threads.clear();
 
             // Make flow from velocities
             tmp.velocity_flow = {};
