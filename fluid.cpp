@@ -39,7 +39,7 @@ public:
             }
         }
 
-//        double start = clock(); // start time
+        double start = clock(); // start time
         for (size_t i = 0; i < T; ++i) {
 
             Fixed<64, 32> total_delta_p = 0;
@@ -147,32 +147,90 @@ public:
                     }
                 }
             } while (prop);
+// Make flow from velocities PARALLEL
+//            tmp.velocity_flow = {};
+//            bool prop = false;
+//            do {
+//                tmp.UT += 2;
+//                prop = false;
+//                for (size_t t = 0; t < num_threads; ++t) {
+//                    threads.emplace_back([&, t]() {
+//                        for (size_t x = t; x < N; x += num_threads) {
+//                            for (size_t y = 0; y < M; ++y) {
+//                                if (tmp.field[x][y] != '#' && tmp.last_use[x][y] != tmp.UT) {
+//                                    auto [t, local_prop, _] = tmp.propagate_flow(x, y, 1);
+//                                    if (t > 0) {
+//                                        prop = true;
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    });
+//                }
+//                for (auto &th : threads) {
+//                    th.join();
+//                }
+//                threads.clear();
+//            } while (prop);
 
-            // Recalculate p with kinetic energy
-            for (size_t x = 0; x < N; ++x) {
-                for (size_t y = 0; y < M; ++y) {
-                    if (tmp.field[x][y] == '#')
-                        continue;
-                    for (auto [dx, dy] : deltas) {
-                        auto old_v = tmp.velocity.get(x, y, dx, dy);
-                        auto new_v = tmp.velocity_flow.get(x, y, dx, dy);
-                        if (old_v > 0) {
-                            assert(new_v <= old_v);
-                            tmp.velocity.get(x, y, dx, dy) = new_v;
-                            auto force = (old_v - new_v) * tmp.rho[(int) tmp.field[x][y]];
-                            if (tmp.field[x][y] == '.')
-                                force *= 0.8;
-                            if (tmp.field[x + dx][y + dy] == '#') {
-                                tmp.p[x][y] += force / tmp.dirs[x][y];
-                                total_delta_p += force / tmp.dirs[x][y];
-                            } else {
-                                tmp.p[x + dx][y + dy] += force / tmp.dirs[x + dx][y + dy];
-                                total_delta_p += force / tmp.dirs[x + dx][y + dy];
+//            // Recalculate p with kinetic energy
+//            for (size_t x = 0; x < N; ++x) {
+//                for (size_t y = 0; y < M; ++y) {
+//                    if (tmp.field[x][y] == '#')
+//                        continue;
+//                    for (auto [dx, dy] : deltas) {
+//                        auto old_v = tmp.velocity.get(x, y, dx, dy);
+//                        auto new_v = tmp.velocity_flow.get(x, y, dx, dy);
+//                        if (old_v > 0) {
+//                            assert(new_v <= old_v);
+//                            tmp.velocity.get(x, y, dx, dy) = new_v;
+//                            auto force = (old_v - new_v) * tmp.rho[(int) tmp.field[x][y]];
+//                            if (tmp.field[x][y] == '.')
+//                                force *= 0.8;
+//                            if (tmp.field[x + dx][y + dy] == '#') {
+//                                tmp.p[x][y] += force / tmp.dirs[x][y];
+//                                total_delta_p += force / tmp.dirs[x][y];
+//                            } else {
+//                                tmp.p[x + dx][y + dy] += force / tmp.dirs[x + dx][y + dy];
+//                                total_delta_p += force / tmp.dirs[x + dx][y + dy];
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+// Recalculate p with kinetic energy
+            for (size_t t = 0; t < num_threads; ++t) {
+                threads.emplace_back([&, t]() {
+                    for (size_t x = t; x < N; x += num_threads) {
+                        for (size_t y = 0; y < M; ++y) {
+                            if (tmp.field[x][y] == '#')
+                                continue;
+                            for (auto [dx, dy] : deltas) {
+                                auto old_v = tmp.velocity.get(x, y, dx, dy);
+                                auto new_v = tmp.velocity_flow.get(x, y, dx, dy);
+                                if (old_v > 0) {
+                                    assert(new_v <= old_v);
+                                    tmp.velocity.get(x, y, dx, dy) = new_v;
+                                    auto force = (old_v - new_v) * tmp.rho[(int)tmp.field[x][y]];
+                                    if (tmp.field[x][y] == '.')
+                                        force *= 0.8;
+                                    if (tmp.field[x + dx][y + dy] == '#') {
+                                        tmp.p[x][y] += force / tmp.dirs[x][y];
+                                        total_delta_p += force / tmp.dirs[x][y];
+                                    } else {
+                                        tmp.p[x + dx][y + dy] += force / tmp.dirs[x + dx][y + dy];
+                                        total_delta_p += force / tmp.dirs[x + dx][y + dy];
+                                    }
+                                }
                             }
                         }
                     }
-                }
+                });
             }
+            for (auto &th : threads) {
+                th.join();
+            }
+            threads.clear();
 
             tmp.UT += 2;
             prop = false;
@@ -196,9 +254,9 @@ public:
 
                 }
             }
-//            if (i == 300){
-//                printf("total time for 300 ticks:%.4lf\n", (clock() - start) / CLOCKS_PER_SEC);
-//            }
+            if (i == 300){
+                printf("total time for 300 ticks:%.4lf\n", (clock() - start) / CLOCKS_PER_SEC);
+            }
         }
     }
 };
