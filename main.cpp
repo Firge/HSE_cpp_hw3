@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <iostream>
 #include <cstring>
+#include <memory>
+#include <ctime>
+#include <cstdio>
 
 struct Triplet_int {
     int a, b, c;
@@ -63,28 +66,69 @@ pair<string, string> TakeName(vector<string>& data) {
 }
 
 
+//int main(int argc, char* argv[]) {
+//    std::cout << std::thread::hardware_concurrency() << " concurrent threads are supported.\n";
+//    cout << argc << endl;
+//    std::vector<string> args;
+//    for (int i = 1; i < argc; i++) {
+//        args.push_back(argv[i]);
+//    }
+//    for (auto it = args.begin(); it != args.end(); it++) {
+//        cout << *it << endl;
+//    }
+//    FluidFactory ff = Generate();
+//    string s1, s2;
+//    pair<string,string> p = TakeName(args);
+//    s1 = p.first;
+//    s2 = p.second;
+//    if (s2 == "") {
+//        int N = 36;
+//        int M = 84;
+//        s1 = "f_" + to_string(N) + "_" + to_string(M) + "_" + s1;
+//    }
+//    else {
+//
+//    }
+//    std::unique_ptr<FluidBase> t = ff.create(s1);
+//    t->fluid();
+//}
 int main(int argc, char* argv[]) {
-    cout << argc << endl;
-    std::vector<string> args;
+    size_t num_threads = std::thread::hardware_concurrency(); // Default to max available threads
+
+    std::cout << num_threads << " concurrent threads are supported.\n";
+
+    std::vector<std::string> args;
     for (int i = 1; i < argc; i++) {
         args.push_back(argv[i]);
     }
-    for (auto it = args.begin(); it != args.end(); it++) {
-        cout << *it << endl;
+
+    if (!args.empty() && args[0].find("--threads=") == 0) {
+        try {
+            num_threads = std::stoi(args[0].substr(10));
+            if (num_threads == 0) {
+                throw std::invalid_argument("Invalid number of threads");
+            }
+            args.erase(args.begin());
+        } catch (...) {
+            std::cerr << "Invalid thread count. Using default: " << num_threads << "\n";
+            num_threads = std::thread::hardware_concurrency();
+        }
     }
+    cout << "Number of threads: " << num_threads << endl;
+
     FluidFactory ff = Generate();
-    string s1, s2;
-    pair<string,string> p = TakeName(args);
+    std::string s1, s2;
+    auto p = TakeName(args);
     s1 = p.first;
     s2 = p.second;
-    if (s2 == "") {
+    if (s2.empty()) {
         int N = 36;
         int M = 84;
-        s1 = "f_" + to_string(N) + "_" + to_string(M) + "_" + s1;
+        s1 = "f_" + std::to_string(N) + "_" + std::to_string(M) + "_" + s1;
     }
-    else {
 
-    }
     std::unique_ptr<FluidBase> t = ff.create(s1);
-    t->fluid();
+    t->fluid(num_threads);
+
+    return 0;
 }
