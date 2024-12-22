@@ -11,13 +11,13 @@ constexpr size_t N = 36, M = 84;
 
 class FluidBase {
 	public:
-	virtual void fluid() = 0;
+	virtual void fluid(size_t num_threads) = 0;
 };
 
 template<int N, int M, typename T1, typename T2, typename T3>
 class Fluid: public FluidBase {
 public:
-    void fluid() override{
+    void fluid(size_t num_threads) override{
         Data<N, M, T1, T2, T3> tmp;
 
         // void fluid(){
@@ -54,9 +54,9 @@ public:
 //            }
 // параллель на расчёт external forces
             std::vector<std::thread> threads;
-            for (size_t t = 0; t < std::thread::hardware_concurrency(); ++t) {
+            for (size_t t = 0; t < num_threads; ++t) {
                 threads.emplace_back([&, t]() {
-                    for (size_t x = t; x < N; x += std::thread::hardware_concurrency()) {
+                    for (size_t x = t; x < N; x += num_threads) {
                         for (size_t y = 0; y < M; ++y) {
                             if (tmp.field[x][y] == '#')
                                 continue;
@@ -98,9 +98,9 @@ public:
 //            }
 // распаралелленное давление
             memcpy(tmp.old_p, tmp.p, sizeof(tmp.p));
-            for (size_t t = 0; t < std::thread::hardware_concurrency(); ++t) {
+            for (size_t t = 0; t < num_threads; ++t) {
                 threads.emplace_back([&, t]() {
-                    for (size_t x = t; x < N; x += std::thread::hardware_concurrency()) {
+                    for (size_t x = t; x < N; x += num_threads) {
                         for (size_t y = 0; y < M; ++y) {
                             if (tmp.field[x][y] == '#')
                                 continue;
