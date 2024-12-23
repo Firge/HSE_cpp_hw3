@@ -1,5 +1,8 @@
 # HSE_cpp_hw3
 
+Параметры запуска --p-type=Fixed(32,16), --v-type=Fixed(32,16), --v-flow-type=double
+Сначала выполнить generate
+
 Было произведено изменение без использования потоков:
 (закомментирована изначальная реализация)
 ![image](https://github.com/user-attachments/assets/85657108-abd4-4360-bfa8-7a8df27100fb)
